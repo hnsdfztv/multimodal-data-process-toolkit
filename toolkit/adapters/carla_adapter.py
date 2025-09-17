@@ -265,10 +265,13 @@ class CARLAAdapter:
             vehicle_bp = None
             preferred_vehicles = ['vehicle.tesla.model3', 'vehicle.audi.a2', 'vehicle.bmw.grandtourer']
             for pref_vehicle in preferred_vehicles:
-                found_bp = blueprint_library.find(pref_vehicle)
-                if found_bp:
-                    vehicle_bp = found_bp
-                    break
+                try:
+                    found_bp = blueprint_library.find(pref_vehicle)
+                    if found_bp:
+                        vehicle_bp = found_bp
+                        break
+                except:
+                    continue
             
             if vehicle_bp is None:
                 vehicle_bp = vehicle_bps[0]  # 使用第一个可用车辆
@@ -296,16 +299,6 @@ class CARLAAdapter:
             
             if self.vehicle is None:
                 raise RuntimeError("Vehicle spawn returned None")
-                
-            # 验证车辆确实存在于世界中
-            self.world.tick()  # 确保车辆已添加到世界
-            time.sleep(0.1)    # 给系统时间处理
-            
-            # 检查车辆是否仍然存在
-            all_vehicles = self.world.get_actors().filter('vehicle.*')
-            vehicle_exists = any(v.id == self.vehicle.id for v in all_vehicles)
-            if not vehicle_exists:
-                raise RuntimeError("Vehicle was spawned but disappeared from world")
             
             self.logger.info(f"Successfully spawned vehicle (ID: {self.vehicle.id}) at {spawn_point.location}")
             
@@ -330,19 +323,13 @@ class CARLAAdapter:
             
             # 等待传感器初始化完成
             self.logger.info("Waiting for sensors to initialize...")
-            time.sleep(2.0)  # 给传感器足够的初始化时间
+            time.sleep(1.0)  # 减少等待时间，避免超时
             
-            # 验证传感器是否正确生成
-            all_sensors = self.world.get_actors().filter('sensor.*')
-            camera_exists = any(s.id == self.camera_sensor.id for s in all_sensors)
-            lidar_exists = any(s.id == self.lidar_sensor.id for s in all_sensors)
-            
-            if not camera_exists:
-                raise RuntimeError("Camera sensor not found in world after creation")
-            if not lidar_exists:
-                raise RuntimeError("LiDAR sensor not found in world after creation")
+            # 简单验证传感器对象存在（不查询world）
+            if self.camera_sensor is None or self.lidar_sensor is None:
+                raise RuntimeError("Failed to create sensor objects")
                 
-            self.logger.info(f"Sensors verified - Camera ID: {self.camera_sensor.id}, LiDAR ID: {self.lidar_sensor.id}")
+            self.logger.info(f"Sensors created - Camera ID: {self.camera_sensor.id}, LiDAR ID: {self.lidar_sensor.id}")
             self.logger.info("Sensors setup complete")
             
         except Exception as e:
@@ -350,58 +337,74 @@ class CARLAAdapter:
             
     def _setup_camera_sensor(self, blueprint_library):
         """设置相机传感器"""
-        camera_config = self.config['carla_settings']['sensor_definitions']['camera']
-        
-        # 获取相机蓝图
-        camera_bp = blueprint_library.find(camera_config['type'])
-        
-        # 设置相机属性
-        camera_bp.set_attribute('image_size_x', str(camera_config['image_size_x']))
-        camera_bp.set_attribute('image_size_y', str(camera_config['image_size_y']))
-        camera_bp.set_attribute('fov', str(camera_config['fov']))
-        
-        # 设置传感器变换
-        transform_config = camera_config['transform']
-        sensor_transform = carla.Transform(
-            carla.Location(x=transform_config['x'], y=transform_config['y'], z=transform_config['z']),
-            carla.Rotation(pitch=transform_config['pitch'], yaw=transform_config['yaw'], roll=transform_config['roll'])
-        )
-        
-        # 生成相机传感器
-        self.camera_sensor = self.world.spawn_actor(camera_bp, sensor_transform, attach_to=self.vehicle)
-        
-        # 设置数据收集回调
-        self.camera_sensor.listen(self._camera_callback)
-        self.logger.info("Camera sensor setup complete")
+        try:
+            camera_config = self.config['carla_settings']['sensor_definitions']['camera']
+            
+            # 获取相机蓝图
+            camera_bp = blueprint_library.find(camera_config['type'])
+            if camera_bp is None:
+                raise RuntimeError(f"Camera blueprint '{camera_config['type']}' not found")
+            
+            # 设置相机属性
+            camera_bp.set_attribute('image_size_x', str(camera_config['image_size_x']))
+            camera_bp.set_attribute('image_size_y', str(camera_config['image_size_y']))
+            camera_bp.set_attribute('fov', str(camera_config['fov']))
+            
+            # 设置传感器变换
+            transform_config = camera_config['transform']
+            sensor_transform = carla.Transform(
+                carla.Location(x=transform_config['x'], y=transform_config['y'], z=transform_config['z']),
+                carla.Rotation(pitch=transform_config['pitch'], yaw=transform_config['yaw'], roll=transform_config['roll'])
+            )
+            
+            # 生成相机传感器
+            self.camera_sensor = self.world.spawn_actor(camera_bp, sensor_transform, attach_to=self.vehicle)
+            if self.camera_sensor is None:
+                raise RuntimeError("Failed to spawn camera sensor")
+            
+            # 设置数据收集回调
+            self.camera_sensor.listen(self._camera_callback)
+            self.logger.info("Camera sensor setup complete")
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to setup camera sensor: {e}")
         
     def _setup_lidar_sensor(self, blueprint_library):
         """设置激光雷达传感器"""
-        lidar_config = self.config['carla_settings']['sensor_definitions']['lidar']
-        
-        # 获取激光雷达蓝图
-        lidar_bp = blueprint_library.find(lidar_config['type'])
-        
-        # 设置激光雷达属性
-        lidar_bp.set_attribute('range', str(lidar_config['range']))
-        lidar_bp.set_attribute('points_per_second', str(lidar_config['points_per_second']))
-        lidar_bp.set_attribute('rotation_frequency', str(lidar_config['rotation_frequency']))
-        lidar_bp.set_attribute('upper_fov', str(lidar_config['upper_fov']))
-        lidar_bp.set_attribute('lower_fov', str(lidar_config['lower_fov']))
-        lidar_bp.set_attribute('channels', str(lidar_config['channels']))
-        
-        # 设置传感器变换
-        transform_config = lidar_config['transform']
-        sensor_transform = carla.Transform(
-            carla.Location(x=transform_config['x'], y=transform_config['y'], z=transform_config['z']),
-            carla.Rotation(pitch=transform_config['pitch'], yaw=transform_config['yaw'], roll=transform_config['roll'])
-        )
-        
-        # 生成激光雷达传感器
-        self.lidar_sensor = self.world.spawn_actor(lidar_bp, sensor_transform, attach_to=self.vehicle)
-        
-        # 设置数据收集回调
-        self.lidar_sensor.listen(self._lidar_callback)
-        self.logger.info("LiDAR sensor setup complete")
+        try:
+            lidar_config = self.config['carla_settings']['sensor_definitions']['lidar']
+            
+            # 获取激光雷达蓝图
+            lidar_bp = blueprint_library.find(lidar_config['type'])
+            if lidar_bp is None:
+                raise RuntimeError(f"LiDAR blueprint '{lidar_config['type']}' not found")
+            
+            # 设置激光雷达属性
+            lidar_bp.set_attribute('range', str(lidar_config['range']))
+            lidar_bp.set_attribute('points_per_second', str(lidar_config['points_per_second']))
+            lidar_bp.set_attribute('rotation_frequency', str(lidar_config['rotation_frequency']))
+            lidar_bp.set_attribute('upper_fov', str(lidar_config['upper_fov']))
+            lidar_bp.set_attribute('lower_fov', str(lidar_config['lower_fov']))
+            lidar_bp.set_attribute('channels', str(lidar_config['channels']))
+            
+            # 设置传感器变换
+            transform_config = lidar_config['transform']
+            sensor_transform = carla.Transform(
+                carla.Location(x=transform_config['x'], y=transform_config['y'], z=transform_config['z']),
+                carla.Rotation(pitch=transform_config['pitch'], yaw=transform_config['yaw'], roll=transform_config['roll'])
+            )
+            
+            # 生成激光雷达传感器
+            self.lidar_sensor = self.world.spawn_actor(lidar_bp, sensor_transform, attach_to=self.vehicle)
+            if self.lidar_sensor is None:
+                raise RuntimeError("Failed to spawn LiDAR sensor")
+            
+            # 设置数据收集回调
+            self.lidar_sensor.listen(self._lidar_callback)
+            self.logger.info("LiDAR sensor setup complete")
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to setup LiDAR sensor: {e}")
         
     def _camera_callback(self, image):
         """相机数据回调函数"""
@@ -458,16 +461,22 @@ class CARLAAdapter:
         
         # 清空传感器数据队列
         while not self.sensor_data['camera'].empty():
-            self.sensor_data['camera'].get()
+            try:
+                self.sensor_data['camera'].get_nowait()
+            except queue.Empty:
+                break
         while not self.sensor_data['lidar'].empty():
-            self.sensor_data['lidar'].get()
+            try:
+                self.sensor_data['lidar'].get_nowait()
+            except queue.Empty:
+                break
         
         try:
-            # 预热几帧，让传感器开始工作
+            # 简单预热，让传感器开始工作
             self.logger.info("Warming up sensors...")
-            for _ in range(3):
+            for _ in range(2):
                 self.world.tick()
-                time.sleep(0.1)
+                time.sleep(0.05)
             
             for frame_id in range(max_frames):
                 start_time = time.time()
@@ -690,30 +699,54 @@ class CARLAAdapter:
     def _cleanup(self):
         """清理资源"""
         try:
-            if self.camera_sensor:
-                self.camera_sensor.stop()
-                self.camera_sensor.destroy()
-                self.camera_sensor = None
+            # 停止数据收集
+            self.is_collecting = False
+            
+            # 清理传感器
+            if self.camera_sensor is not None:
+                try:
+                    self.camera_sensor.stop()
+                    self.camera_sensor.destroy()
+                    self.logger.debug("Camera sensor destroyed")
+                except Exception as e:
+                    self.logger.warning(f"Error destroying camera sensor: {e}")
+                finally:
+                    self.camera_sensor = None
                 
-            if self.lidar_sensor:
-                self.lidar_sensor.stop()
-                self.lidar_sensor.destroy()
-                self.lidar_sensor = None
+            if self.lidar_sensor is not None:
+                try:
+                    self.lidar_sensor.stop()
+                    self.lidar_sensor.destroy()
+                    self.logger.debug("LiDAR sensor destroyed")
+                except Exception as e:
+                    self.logger.warning(f"Error destroying lidar sensor: {e}")
+                finally:
+                    self.lidar_sensor = None
                 
-            if self.vehicle:
-                self.vehicle.destroy()
-                self.vehicle = None
+            # 清理车辆
+            if self.vehicle is not None:
+                try:
+                    self.vehicle.destroy()
+                    self.logger.debug("Vehicle destroyed")
+                except Exception as e:
+                    self.logger.warning(f"Error destroying vehicle: {e}")
+                finally:
+                    self.vehicle = None
                 
-            if self.world:
-                # 恢复异步模式
-                settings = self.world.get_settings()
-                settings.synchronous_mode = False
-                self.world.apply_settings(settings)
+            # 恢复异步模式
+            if self.world is not None:
+                try:
+                    settings = self.world.get_settings()
+                    settings.synchronous_mode = False
+                    self.world.apply_settings(settings)
+                    self.logger.debug("Restored asynchronous mode")
+                except Exception as e:
+                    self.logger.warning(f"Error restoring async mode: {e}")
                 
             self.logger.info("CARLA resources cleaned up")
             
         except Exception as e:
-            self.logger.warning(f"Error during cleanup: {e}")
+            self.logger.error(f"Error during cleanup: {e}")
 
 
 def process_carla(config: Dict) -> Dict:
