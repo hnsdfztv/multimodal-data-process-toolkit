@@ -13,8 +13,12 @@ ROS2 Bag适配器模块
 
 import os
 import sys
+import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+import logging
+import numpy as np
 import logging
 
 # ROS2相关导入（只在这个适配器中使用）
@@ -27,11 +31,18 @@ try:
     from sensor_msgs.msg import Image, LaserScan
     from geometry_msgs.msg import TransformStamped
     import tf2_ros
+    from tf2_ros import TransformException
+    import tf2_geometry_msgs
     from cv_bridge import CvBridge
     ROS2_AVAILABLE = True
 except ImportError as e:
     ROS2_AVAILABLE = False
     ROS2_IMPORT_ERROR = str(e)
+    # 为了避免类型注解错误，创建虚拟的类型
+    tf2_ros = type('tf2_ros', (), {'Buffer': type('Buffer', (), {})})
+    LaserScan = type('LaserScan', (), {})
+    TransformStamped = type('TransformStamped', (), {})
+    Image = type('Image', (), {})
 
 import numpy as np
 
