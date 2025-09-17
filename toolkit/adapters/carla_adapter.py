@@ -231,8 +231,11 @@ class CARLAAdapter:
             # 设置同步模式
             settings = self.world.get_settings()
             settings.synchronous_mode = True
-            settings.fixed_delta_seconds = 0.05  # 20 FPS
+            settings.fixed_delta_seconds = 0.1  # 10 FPS，给传感器更多时间
+            settings.no_rendering_mode = False  # 确保渲染模式开启
             self.world.apply_settings(settings)
+            
+            self.logger.info(f"Applied synchronous mode with {settings.fixed_delta_seconds}s delta")
             
             # 设置交通管理器为同步模式
             traffic_manager = self.client.get_trafficmanager()
@@ -254,19 +257,57 @@ class CARLAAdapter:
         try:
             # 获取车辆蓝图
             blueprint_library = self.world.get_blueprint_library()
-            vehicle_bp = blueprint_library.filter('vehicle')[0]  # 选择第一个可用车辆
+            vehicle_bps = blueprint_library.filter('vehicle.*')
+            if not vehicle_bps:
+                raise RuntimeError("No vehicle blueprints available")
+            
+            # 选择一个常见的车辆类型
+            vehicle_bp = None
+            preferred_vehicles = ['vehicle.tesla.model3', 'vehicle.audi.a2', 'vehicle.bmw.grandtourer']
+            for pref_vehicle in preferred_vehicles:
+                found_bp = blueprint_library.find(pref_vehicle)
+                if found_bp:
+                    vehicle_bp = found_bp
+                    break
+            
+            if vehicle_bp is None:
+                vehicle_bp = vehicle_bps[0]  # 使用第一个可用车辆
+            
+            self.logger.info(f"Using vehicle blueprint: {vehicle_bp.id}")
             
             # 获取生成点
             spawn_points = self.world.get_map().get_spawn_points()
             if not spawn_points:
                 raise RuntimeError("No spawn points available in the world")
                 
-            # 随机选择一个生成点
-            spawn_point = random.choice(spawn_points)
+            # 尝试多个生成点，直到成功生成车辆
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                spawn_point = random.choice(spawn_points)
+                try:
+                    self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+                    if self.vehicle is not None:
+                        break
+                except Exception as spawn_error:
+                    self.logger.warning(f"Spawn attempt {attempt + 1} failed at {spawn_point.location}: {spawn_error}")
+                    if attempt == max_attempts - 1:
+                        raise RuntimeError(f"Failed to spawn vehicle after {max_attempts} attempts")
+                    continue
             
-            # 生成车辆
-            self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-            self.logger.info(f"Spawned vehicle at {spawn_point.location}")
+            if self.vehicle is None:
+                raise RuntimeError("Vehicle spawn returned None")
+                
+            # 验证车辆确实存在于世界中
+            self.world.tick()  # 确保车辆已添加到世界
+            time.sleep(0.1)    # 给系统时间处理
+            
+            # 检查车辆是否仍然存在
+            all_vehicles = self.world.get_actors().filter('vehicle.*')
+            vehicle_exists = any(v.id == self.vehicle.id for v in all_vehicles)
+            if not vehicle_exists:
+                raise RuntimeError("Vehicle was spawned but disappeared from world")
+            
+            self.logger.info(f"Successfully spawned vehicle (ID: {self.vehicle.id}) at {spawn_point.location}")
             
             # 启用自动驾驶（可选）
             if self.config.get('enable_autopilot', True):
@@ -287,6 +328,21 @@ class CARLAAdapter:
             # 设置激光雷达传感器
             self._setup_lidar_sensor(blueprint_library)
             
+            # 等待传感器初始化完成
+            self.logger.info("Waiting for sensors to initialize...")
+            time.sleep(2.0)  # 给传感器足够的初始化时间
+            
+            # 验证传感器是否正确生成
+            all_sensors = self.world.get_actors().filter('sensor.*')
+            camera_exists = any(s.id == self.camera_sensor.id for s in all_sensors)
+            lidar_exists = any(s.id == self.lidar_sensor.id for s in all_sensors)
+            
+            if not camera_exists:
+                raise RuntimeError("Camera sensor not found in world after creation")
+            if not lidar_exists:
+                raise RuntimeError("LiDAR sensor not found in world after creation")
+                
+            self.logger.info(f"Sensors verified - Camera ID: {self.camera_sensor.id}, LiDAR ID: {self.lidar_sensor.id}")
             self.logger.info("Sensors setup complete")
             
         except Exception as e:
@@ -350,6 +406,8 @@ class CARLAAdapter:
     def _camera_callback(self, image):
         """相机数据回调函数"""
         if self.is_collecting:
+            self.logger.debug(f"Camera callback triggered for frame {image.frame}")
+            
             # 将CARLA图像转换为numpy数组
             image_array = np.frombuffer(image.raw_data, dtype=np.uint8)
             image_array = image_array.reshape((image.height, image.width, 4))  # BGRA
@@ -368,10 +426,13 @@ class CARLAAdapter:
             )
             
             self.sensor_data['camera'].put((image.frame, sensor_data))
+            self.logger.debug(f"Camera data queued for frame {image.frame}")
             
     def _lidar_callback(self, lidar_data):
         """激光雷达数据回调函数"""
         if self.is_collecting:
+            self.logger.debug(f"LiDAR callback triggered for frame {lidar_data.frame}")
+            
             # 将CARLA LiDAR数据转换为numpy数组
             points = np.frombuffer(lidar_data.raw_data, dtype=np.float32)
             points = points.reshape((-1, 4))  # [x, y, z, intensity]
@@ -388,13 +449,26 @@ class CARLAAdapter:
             )
             
             self.sensor_data['lidar'].put((lidar_data.frame, sensor_data))
+            self.logger.debug(f"LiDAR data queued for frame {lidar_data.frame}, points: {len(points)}")
             
     def _collect_data(self, max_frames: int, directories: Dict):
         """收集数据主循环"""
         self.logger.info(f"Starting data collection for {max_frames} frames")
         self.is_collecting = True
         
+        # 清空传感器数据队列
+        while not self.sensor_data['camera'].empty():
+            self.sensor_data['camera'].get()
+        while not self.sensor_data['lidar'].empty():
+            self.sensor_data['lidar'].get()
+        
         try:
+            # 预热几帧，让传感器开始工作
+            self.logger.info("Warming up sensors...")
+            for _ in range(3):
+                self.world.tick()
+                time.sleep(0.1)
+            
             for frame_id in range(max_frames):
                 start_time = time.time()
                 
@@ -402,12 +476,23 @@ class CARLAAdapter:
                 self.world.tick()
                 self.stats['frames_collected'] += 1
                 
+                # 给传感器回调足够的时间处理数据
+                time.sleep(0.1)  # 等待传感器数据到达
+                
                 # 等待传感器数据
                 camera_data = self._wait_for_sensor_data('camera', frame_id)
                 lidar_data = self._wait_for_sensor_data('lidar', frame_id)
                 
+                if camera_data is None:
+                    self.logger.warning(f"Frame {frame_id}: Missing camera data")
+                if lidar_data is None:
+                    self.logger.warning(f"Frame {frame_id}: Missing lidar data")
+                    
                 if camera_data is None or lidar_data is None:
-                    self.logger.warning(f"Frame {frame_id}: Missing sensor data")
+                    # 检查传感器队列状态
+                    cam_size = self.sensor_data['camera'].qsize()
+                    lidar_size = self.sensor_data['lidar'].qsize()
+                    self.logger.debug(f"Frame {frame_id}: Queue sizes - Camera: {cam_size}, LiDAR: {lidar_size}")
                     continue
                 
                 # 获取真值对象信息
@@ -429,7 +514,7 @@ class CARLAAdapter:
                 process_time = time.time() - start_time
                 self.stats['simulation_time'] += process_time
                 
-                if (frame_id + 1) % 100 == 0:
+                if (frame_id + 1) % 10 == 0:
                     self.logger.info(f"Processed {frame_id + 1}/{max_frames} frames")
                     
         finally:
@@ -441,16 +526,26 @@ class CARLAAdapter:
         
         while time.time() - start_time < timeout:
             try:
-                received_frame, data = self.sensor_data[sensor_type].get(timeout=0.1)
+                received_frame, data = self.sensor_data[sensor_type].get(timeout=0.05)
+                
+                # 检查帧ID匹配
                 if received_frame == frame_id:
+                    self.logger.debug(f"Found matching {sensor_type} data for frame {frame_id}")
                     return data
                 elif received_frame > frame_id:
                     # 收到了后续帧的数据，说明当前帧数据丢失
+                    self.logger.debug(f"Got future {sensor_type} frame {received_frame} while waiting for {frame_id}")
                     self.sensor_data[sensor_type].put((received_frame, data))  # 放回队列
                     return None
+                else:
+                    # 收到了过时的数据，丢弃
+                    self.logger.debug(f"Discarding old {sensor_type} frame {received_frame} while waiting for {frame_id}")
+                    continue
+                    
             except queue.Empty:
                 continue
                 
+        self.logger.debug(f"Timeout waiting for {sensor_type} data for frame {frame_id}")
         return None
         
     def _get_ground_truth_objects(self) -> List[GroundTruthObject]:
