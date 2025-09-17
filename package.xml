@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <!-- 包基本信息 -->
+  <name>multimodal_data_toolkit</name>
+  <version>1.0.0</version>
+  <description>
+    跨平台多模态数据收集与KITTI格式转换工具包。
+    支持从ROS2 bag文件和CARLA仿真器收集同步的图像、激光雷达数据，
+    并转换为标准的KITTI数据集格式，包括真值标注信息。
+    
+    Cross-platform multimodal data collection and KITTI format conversion toolkit.
+    Supports collecting synchronized image and LiDAR data from ROS2 bag files and CARLA simulator,
+    and converts them to standard KITTI dataset format with ground truth annotations.
+  </description>
+
+  <!-- 维护者信息 -->
+  <maintainer email="your.email@example.com">Multimodal Data Toolkit Team</maintainer>
+
+  <!-- 许可证 -->
+  <license>MIT</license>
+
+  <!-- 项目网站和代码仓库 -->
+  <url type="website">https://github.com/your-username/multimodal-data-toolkit</url>
+  <url type="bugtracker">https://github.com/your-username/multimodal-data-toolkit/issues</url>
+  <url type="repository">https://github.com/your-username/multimodal-data-toolkit</url>
+
+  <!-- 作者信息 -->
+  <author email="your.email@example.com">Your Name</author>
+
+  <!-- 构建工具依赖 -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <!-- 构建依赖 -->
+  <build_depend>rclpy</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>tf2_geometry_msgs</build_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>rosbag2_py</build_depend>
+
+  <!-- 执行依赖 -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>rosbag2_py</exec_depend>
+  
+  <!-- Python依赖 -->
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <!-- 测试依赖 -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <!-- 文档依赖 -->
+  <doc_depend>python3-sphinx</doc_depend>
+
+  <!-- 包导出信息 -->
+  <export>
+    <build_type>ament_python</build_type>
+    
+    <!-- 包标签，用于分类和搜索 -->
+    <tag>robotics</tag>
+    <tag>computer-vision</tag>
+    <tag>dataset</tag>
+    <tag>kitti</tag>
+    <tag>multimodal</tag>
+    <tag>data-processing</tag>
+    <tag>simulation</tag>
+    <tag>autonomous-driving</tag>
+  </export>
+
+  <!-- 包元信息 -->
+  <group_depend>ros_base</group_depend>
+  
+  <!-- 兼容性信息 -->
+  <condition>
+    <ros_distro>humble</ros_distro>
+  </condition>
+  
+  <!-- 包的额外元数据 -->
+  <metadata>
+    <!-- 支持的平台 -->
+    <platform>linux</platform>
+    <platform>windows</platform>
+    <platform>macos</platform>
+    
+    <!-- 支持的架构 -->
+    <architecture>x86_64</architecture>
+    <architecture>arm64</architecture>
+    
+    <!-- 包的特性 -->
+    <feature>multimodal-data-collection</feature>
+    <feature>kitti-format-conversion</feature>
+    <feature>ros2-bag-processing</feature>
+    <feature>carla-simulation-support</feature>
+    <feature>cross-platform</feature>
+    
+    <!-- 性能特征 -->
+    <performance>
+      <cpu_usage>medium</cpu_usage>
+      <memory_usage>medium</memory_usage>
+      <disk_usage>high</disk_usage>
+      <network_usage>low</network_usage>
+    </performance>
+  </metadata>
+</package>

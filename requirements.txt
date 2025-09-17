@@ -1,0 +1,126 @@
+# 多模态数据工具链依赖项
+# Multimodal Data Toolkit Dependencies
+
+# ============================================================================
+# 核心依赖 / Core Dependencies
+# ============================================================================
+
+# 数值计算和数组处理
+numpy<2.0  # ROS2 Humble兼容性要求 / Required for ROS2 Humble compatibility
+
+# 配置文件处理
+PyYAML>=5.4.0
+
+# ============================================================================
+# 图像处理 / Image Processing
+# ============================================================================
+
+# OpenCV用于图像读写和处理
+opencv-python>=4.5.0
+
+# PIL/Pillow作为备选图像处理库
+Pillow>=8.0.0
+
+# ============================================================================
+# ROS2依赖 / ROS2 Dependencies
+# ============================================================================
+# 注意：这些依赖通常通过ROS2安装提供，不需要通过pip安装
+# Note: These dependencies are usually provided by ROS2 installation
+
+# rosbag2相关（如果需要通过pip安装）
+# rosbag2-py  # Usually provided by ROS2 installation
+# rclpy  # Usually provided by ROS2 installation
+# sensor-msgs  # Usually provided by ROS2 installation
+# geometry-msgs  # Usually provided by ROS2 installation
+# tf2-ros  # Usually provided by ROS2 installation
+# cv-bridge  # Usually provided by ROS2 installation
+
+# ============================================================================
+# CARLA依赖 / CARLA Dependencies  
+# ============================================================================
+
+# CARLA Python API（需要从CARLA安装目录获取）
+# carla  # Must be installed from CARLA distribution
+
+# ============================================================================
+# 开发和测试依赖 / Development and Testing Dependencies
+# ============================================================================
+
+# 代码质量检查
+pytest>=6.0.0
+flake8>=3.8.0
+black>=21.0.0
+
+# 类型检查
+mypy>=0.900
+
+# 文档生成
+sphinx>=4.0.0
+sphinx-rtd-theme>=0.5.0
+
+# ============================================================================
+# 可选依赖 / Optional Dependencies
+# ============================================================================
+
+# 性能分析
+# cProfile  # Built-in Python module
+
+# 进度条显示
+tqdm>=4.60.0
+
+# 数据可视化（调试用）
+matplotlib>=3.3.0
+
+# 点云处理（如果需要高级功能）
+# open3d>=0.13.0  # Optional for advanced point cloud processing
+
+# ============================================================================
+# 平台特定依赖 / Platform-specific Dependencies
+# ============================================================================
+
+# Linux平台
+# 通常ROS2和相关依赖已通过系统包管理器安装
+
+# Windows平台（实验性支持）
+# 可能需要额外的Visual C++运行时库
+
+# macOS平台（实验性支持） 
+# 可能需要Homebrew安装的依赖项
+
+# ============================================================================
+# 版本兼容性说明 / Version Compatibility Notes
+# ============================================================================
+
+# Python版本要求：3.8+
+# ROS2版本要求：Humble (推荐) 或更高版本
+# CARLA版本要求：0.9.13+ (推荐最新稳定版)
+# Ubuntu版本要求：20.04+ (对于ROS2 Humble)
+
+# ============================================================================
+# 安装说明 / Installation Notes
+# ============================================================================
+
+# 1. 基础Python依赖：
+#    pip install -r requirements.txt
+
+# 2. ROS2依赖：
+#    请按照ROS2官方文档安装ROS2 Humble
+#    source /opt/ros/humble/setup.bash
+
+# 3. CARLA依赖：
+#    下载CARLA并将PythonAPI添加到PYTHONPATH
+#    export PYTHONPATH=$PYTHONPATH:/path/to/CARLA/PythonAPI/carla/dist/carla-0.9.13-py3.7-linux-x86_64.egg
+
+# 4. 工作区构建：
+#    cd /path/to/your/ros2_workspace
+#    colcon build --packages-select multimodal_data_toolkit
+
+# ============================================================================
+# 故障排除 / Troubleshooting
+# ============================================================================
+
+# 如果遇到导入错误：
+# 1. 确认ROS2环境已正确source
+# 2. 确认PYTHONPATH包含CARLA Python API路径
+# 3. 检查Python版本兼容性
+# 4. 验证所有依赖包版本

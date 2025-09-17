@@ -1,0 +1,298 @@
+# ============================================================================
+# 多模态数据工具链配置文件
+# ============================================================================
+# 本配置文件定义了跨平台数据收集和KITTI格式转换的所有参数
+# 支持的数据源：'rosbag' (ROS2 bag文件) 和 'carla' (CARLA仿真器)
+#
+# 使用方法：
+#   python run_processing.py --config config/default_config.yaml
+# ============================================================================
+
+# ============================================================================
+# 基础配置
+# ============================================================================
+
+# 数据源类型：'rosbag' 或 'carla'
+source_type: 'carla'
+
+# 输出路径（KITTI数据集格式目录）
+output_path: "/home/yyc/project-1/turtlebot3_ws/multimodal_dataset/kitti_format"
+
+# 通用处理设置
+general_settings:
+  # 时间同步容忍度（秒）- 仅对rosbag有效
+  sync_tolerance_s: 0.02
+  
+  # 是否生成标注文件（需要真值信息）
+  generate_annotations: true
+  
+  # 是否保存相机标定信息
+  save_calibration: true
+  
+  # 日志级别：DEBUG, INFO, WARNING, ERROR
+  log_level: "INFO"
+  
+  # 最大处理帧数（0表示处理所有帧）
+  max_frames: 1000
+
+# ============================================================================
+# ROS2 Bag适配器设置
+# ============================================================================
+rosbag_settings:
+  # ROS2 bag文件路径
+  path: "/path/to/your/rosbag"
+  
+  # 传感器话题名称
+  image_topic: "/camera/image_raw"
+  lidar_topic: "/scan"
+  
+  # 坐标系名称
+  camera_frame_id: "camera_link"
+  lidar_frame_id: "base_scan"
+  
+  # 附加话题（可选）
+  additional_topics:
+    # 如果有其他传感器数据，可以在这里添加
+    # imu_topic: "/imu/data"
+    # odom_topic: "/odom"
+
+# ============================================================================  
+# CARLA仿真器适配器设置
+# ============================================================================
+carla_settings:
+  # CARLA服务器连接信息
+  host: "localhost"
+  port: 2000
+  
+  # 仿真世界名称
+  world: "Town03"
+  
+  # 车辆设置
+  vehicle_settings:
+    # 是否启用自动驾驶
+    enable_autopilot: true
+    
+    # 车辆类型过滤器（可选）
+    vehicle_filter: "vehicle.tesla.model3"
+  
+  # 传感器定义
+  sensor_definitions:
+    # 相机传感器配置
+    camera:
+      type: "sensor.camera.rgb"
+      
+      # 图像分辨率
+      image_size_x: 1242
+      image_size_y: 375
+      
+      # 视场角（度）
+      fov: 90
+      
+      # 相机相对于车辆的变换（米和度）
+      transform:
+        x: 1.5    # 前方
+        y: 0.0    # 中央
+        z: 2.4    # 高度
+        pitch: 0.0  # 俯仰角
+        yaw: 0.0    # 偏航角  
+        roll: 0.0   # 滚转角
+    
+    # 激光雷达传感器配置
+    lidar:
+      type: "sensor.lidar.ray_cast"
+      
+      # 探测范围（米）
+      range: 85.0
+      
+      # 每秒点数
+      points_per_second: 130000
+      
+      # 旋转频率（Hz）
+      rotation_frequency: 20
+      
+      # 垂直视场角（度）
+      upper_fov: 10.0
+      lower_fov: -30.0
+      
+      # 激光束通道数
+      channels: 64
+      
+      # 激光雷达相对于车辆的变换
+      transform:
+        x: 1.5
+        y: 0.0
+        z: 2.4
+        pitch: 0.0
+        yaw: 0.0
+        roll: 0.0
+  
+  # 仿真设置
+  simulation_settings:
+    # 仿真时间步长（秒）
+    fixed_delta_seconds: 0.05  # 20 FPS
+    
+    # 是否启用同步模式（推荐）
+    synchronous_mode: true
+    
+    # 天气设置（可选）
+    weather:
+      cloudiness: 0.0      # 云量 (0-100)
+      precipitation: 0.0   # 降水量 (0-100)  
+      wind_intensity: 0.0  # 风力强度 (0-100)
+      sun_azimuth_angle: 0.0  # 太阳方位角 (度)
+      sun_altitude_angle: 75.0  # 太阳高度角 (度)
+
+# ============================================================================
+# 相机内参配置
+# ============================================================================
+# 这些参数必须与实际传感器或仿真传感器的内参匹配
+# 用于3D到2D的投影变换和标注生成
+camera_intrinsics:
+  # 焦距
+  fx: 621.0
+  fy: 621.0
+  
+  # 主点坐标
+  cx: 621.0
+  cy: 187.5
+  
+  # 图像尺寸（像素）
+  width: 1242
+  height: 375
+  
+  # 畸变系数（可选，通常仿真数据不需要）
+  # distortion: [k1, k2, p1, p2, k3]
+
+# ============================================================================
+# 数据过滤和质量控制设置  
+# ============================================================================
+data_quality:
+  # 图像质量控制
+  image_filters:
+    # 最小图像尺寸
+    min_width: 640
+    min_height: 480
+    
+    # 亮度过滤（0-255）
+    min_brightness: 10
+    max_brightness: 245
+  
+  # 点云质量控制
+  lidar_filters:
+    # 最小点数
+    min_points: 1000
+    
+    # 距离范围（米）
+    min_range: 1.0
+    max_range: 80.0
+    
+    # 高度范围（米，相对于传感器）
+    min_height: -3.0
+    max_height: 5.0
+  
+  # 标注质量控制
+  annotation_filters:
+    # 最小2D边界框尺寸（像素）
+    min_bbox_width: 20
+    min_bbox_height: 20
+    
+    # 最小3D物体尺寸（米）
+    min_object_width: 0.5
+    min_object_height: 0.5
+    min_object_length: 0.5
+
+# ============================================================================
+# 输出格式配置
+# ============================================================================
+output_format:
+  # KITTI数据集格式设置
+  kitti:
+    # 是否生成训练/验证分割
+    generate_train_val_split: true
+    train_split_ratio: 0.8
+    
+    # 文件命名格式
+    frame_id_format: "{:06d}"  # 6位数字，如000000.png
+    
+    # 是否压缩点云文件
+    compress_pointclouds: false
+  
+  # 元数据设置
+  metadata:
+    # 是否保存详细元数据
+    save_detailed_metadata: true
+    
+    # 是否保存传感器配置信息
+    save_sensor_config: true
+    
+    # 是否生成数据集统计信息
+    generate_dataset_stats: true
+
+# ============================================================================
+# 调试和开发设置
+# ============================================================================
+debug:
+  # 是否启用调试模式
+  enable_debug: false
+  
+  # 是否保存中间处理结果
+  save_intermediate_results: false
+  
+  # 调试输出目录
+  debug_output_path: "/tmp/multimodal_toolkit_debug"
+  
+  # 是否显示处理进度条
+  show_progress_bar: true
+  
+  # 性能分析
+  enable_profiling: false
+  
+  # 可视化设置
+  visualization:
+    # 是否保存可视化图像（调试用）
+    save_visualization: false
+    
+    # 是否显示3D边界框投影
+    show_3d_bbox_projection: false
+    
+    # 是否显示传感器坐标系
+    show_coordinate_frames: false
+
+# ============================================================================
+# 扩展配置（预留）
+# ============================================================================
+extensions:
+  # 自定义处理插件（预留接口）
+  custom_processors: []
+  
+  # 额外的数据源支持（预留）
+  additional_sources: []
+  
+  # 输出格式扩展（预留）
+  additional_formats: []
+
+# ============================================================================
+# 示例配置说明
+# ============================================================================
+#
+# 1. 处理ROS2 bag文件示例：
+#    修改 source_type: 'rosbag'
+#    设置正确的 rosbag_settings.path 和话题名称
+#
+# 2. 连接CARLA仿真器示例：
+#    修改 source_type: 'carla'  
+#    确保CARLA服务器在指定地址和端口运行
+#    根据需要调整传感器配置和车辆设置
+#
+# 3. 自定义输出路径：
+#    修改 output_path 为您希望的目录
+#    确保该目录有写权限
+#
+# 4. 质量控制：
+#    根据您的应用场景调整 data_quality 中的过滤参数
+#    这些参数可以帮助过滤掉质量不好的数据
+#
+# 5. 调试和开发：
+#    开发阶段可以启用 debug.enable_debug
+#    这会产生更多的日志信息和中间文件
+# ============================================================================
