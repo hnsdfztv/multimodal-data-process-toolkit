@@ -43,7 +43,7 @@ pip install -r requirements.txt
 
 ```bash
 # 克隆仓库 / Clone repository
-git clone https://github.com/your-username/multimodal-data-toolkit.git
+git clone https://github.com/hnsdfztv/multimodal-data-toolkit.git
 cd multimodal-data-toolkit
 
 # 安装Python依赖 / Install Python dependencies
